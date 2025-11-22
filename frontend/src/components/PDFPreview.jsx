@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { downloadFile } from '../services/api';
 import './PDFPreview.css';
@@ -13,6 +13,23 @@ if (typeof window !== 'undefined') {
 
 function PDFPreview({ filename, onClose }) {
   const [numPages, setNumPages] = useState(null);
+
+  // Handle ESC key to close preview
+  useEffect(() => {
+    const handleEscKey = (event) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    // Add event listener when component mounts
+    window.addEventListener('keydown', handleEscKey);
+
+    // Cleanup: remove event listener when component unmounts
+    return () => {
+      window.removeEventListener('keydown', handleEscKey);
+    };
+  }, [onClose]);
 
   function onDocumentLoadSuccess({ numPages }) {
     setNumPages(numPages);
