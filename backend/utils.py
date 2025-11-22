@@ -72,7 +72,9 @@ def add_training_embedding(
     image_embedding: List[float],
     text_embedding: List[float],
     bbox: tuple,
-    embeddings_path: str = None
+    embeddings_path: str = None,
+    original_image_path: str = None,
+    cropped_image_path: str = None
 ):
     """
     Add a new training embedding to the storage.
@@ -83,6 +85,8 @@ def add_training_embedding(
         text_embedding: Text embedding vector
         bbox: Bounding box of content area (x, y, w, h)
         embeddings_path: Path to embeddings JSON file
+        original_image_path: Path to saved original image
+        cropped_image_path: Path to saved cropped image
     """
     if embeddings_path is None:
         embeddings_path = os.path.join(get_backend_dir(), "data", "embeddings.json")
@@ -93,7 +97,9 @@ def add_training_embedding(
         "image_embedding": image_embedding,
         "text_embedding": text_embedding,
         "bbox": bbox,
-        "filename": filename
+        "filename": filename,
+        "original_image_path": original_image_path,
+        "cropped_image_path": cropped_image_path
     }
     
     save_embeddings(embeddings_data, embeddings_path)

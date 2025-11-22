@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import FileUpload from '../components/FileUpload';
 import PipelineViewer from '../components/PipelineViewer';
-import { trainModel, previewPipeline, getTrainingStatus } from '../services/api';
+import { trainModel, previewPipeline, getTrainingStatus, getTrainingPreview } from '../services/api';
 import './Model.css';
 
 function Model() {
@@ -11,6 +11,7 @@ function Model() {
   const [trainingStatus, setTrainingStatus] = useState(null);
   const [error, setError] = useState(null);
   const [mode, setMode] = useState('preview'); // 'preview' or 'train'
+  const [selectedDocument, setSelectedDocument] = useState(null);
 
   useEffect(() => {
     loadTrainingStatus();
@@ -29,6 +30,7 @@ function Model() {
     setFile(selectedFile);
     setError(null);
     setPipelineData(null);
+    setSelectedDocument(null);
     setProcessing(true);
 
     try {
@@ -42,6 +44,22 @@ function Model() {
       }
     } catch (err) {
       setError(err.response?.data?.detail || err.message || 'Error processing file');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleViewPreview = async (filename) => {
+    setError(null);
+    setPipelineData(null);
+    setSelectedDocument(filename);
+    setProcessing(true);
+
+    try {
+      const result = await getTrainingPreview(filename);
+      setPipelineData(result);
+    } catch (err) {
+      setError(err.response?.data?.detail || err.message || 'Error loading preview');
     } finally {
       setProcessing(false);
     }
@@ -94,7 +112,7 @@ function Model() {
         </div>
       )}
 
-      {pipelineData && (
+      {pipelineData && !selectedDocument && (
         <div className="pipeline-results">
           {mode === 'train' && pipelineData.status === 'success' && (
             <div className="success-message">
@@ -113,16 +131,50 @@ function Model() {
         <div className="training-status">
           <h2>Training Status</h2>
           <p>Number of trained documents: <strong>{trainingStatus.count}</strong></p>
-          {trainingStatus.trained_documents.length > 0 && (
+          {trainingStatus.trained_documents && trainingStatus.trained_documents.length > 0 && (
             <div className="trained-documents">
               <h3>Trained Documents:</h3>
               <ul>
                 {trainingStatus.trained_documents.map((doc, index) => (
-                  <li key={index}>{doc}</li>
+                  <li 
+                    key={index} 
+                    className={`document-item ${selectedDocument === doc.filename ? 'selected' : ''}`}
+                    onClick={() => doc.has_preview && handleViewPreview(doc.filename)}
+                  >
+                    <span className="document-name">{doc.filename}</span>
+                    {doc.has_preview && (
+                      <span className="preview-indicator">✓ Preview available</span>
+                    )}
+                    {!doc.has_preview && (
+                      <span className="no-preview-indicator">No preview</span>
+                    )}
+                  </li>
                 ))}
               </ul>
             </div>
           )}
+        </div>
+      )}
+
+      {selectedDocument && pipelineData && (
+        <div className="saved-pipeline-preview">
+          <div className="preview-header">
+            <h3>Pipeline Preview: {selectedDocument}</h3>
+            <button
+              onClick={() => {
+                setSelectedDocument(null);
+                setPipelineData(null);
+              }}
+              className="close-preview-btn"
+            >
+              Close Preview
+            </button>
+          </div>
+          <PipelineViewer
+            originalImage={pipelineData.original_image}
+            croppedImage={pipelineData.cropped_image}
+            bbox={pipelineData.bbox}
+          />
         </div>
       )}
     </div>

@@ -14,10 +14,10 @@ from embeddings import generate_image_embedding, generate_text_embedding, cosine
 from utils import load_embeddings
 
 
-SIMILARITY_THRESHOLD = 0.85
+SIMILARITY_THRESHOLD = 0.95
 
 
-def find_first_pages(composite_pdf_path: str, embeddings_path: str = None) -> List[int]:
+def find_first_pages(composite_pdf_path: str, embeddings_path: str = None) -> Tuple[List[int], Dict[int, Dict]]:
     """
     Identify first pages in a composite PDF by comparing embeddings.
     
@@ -26,7 +26,7 @@ def find_first_pages(composite_pdf_path: str, embeddings_path: str = None) -> Li
         embeddings_path: Path to embeddings JSON file
     
     Returns:
-        List of page indices (0-indexed) that are identified as first pages
+        Tuple of (list of page indices, dict of page_idx -> similarity info)
     """
     # Load training embeddings
     if embeddings_path is None:
@@ -43,6 +43,7 @@ def find_first_pages(composite_pdf_path: str, embeddings_path: str = None) -> Li
     page_texts = extract_text_from_pdf(composite_pdf_path)
     
     first_pages = []
+    similarity_info = {}  # Store similarity scores for each page
     
     # Process each page
     for page_idx in range(len(page_images)):
@@ -79,23 +80,54 @@ def find_first_pages(composite_pdf_path: str, embeddings_path: str = None) -> Li
                     "combined_score": (image_sim * 0.7) + (text_sim * 0.3)  # Weighted combination
                 })
         
-        # If we have matches, use the best one
+        # Store similarity info for this page (even if no match)
         if matches:
             # Sort by combined score
             matches.sort(key=lambda x: x["combined_score"], reverse=True)
             best_match = matches[0]
             
+            # Log similarity scores for debugging
+            print(f"Page {page_idx + 1}: Best match = {best_match['filename']}")
+            print(f"  Image similarity: {best_match['image_similarity']:.4f} ({best_match['image_similarity']*100:.2f}%)")
+            print(f"  Text similarity: {best_match['text_similarity']:.4f} ({best_match['text_similarity']*100:.2f}%)")
+            print(f"  Combined score: {best_match['combined_score']:.4f} ({best_match['combined_score']*100:.2f}%)")
+            print(f"  Threshold: {SIMILARITY_THRESHOLD:.4f} ({SIMILARITY_THRESHOLD*100:.2f}%)")
+            
+            # Store similarity info
+            similarity_info[page_idx] = {
+                "matched": best_match["combined_score"] > SIMILARITY_THRESHOLD,
+                "best_match": best_match["filename"],
+                "image_similarity": best_match["image_similarity"],
+                "text_similarity": best_match["text_similarity"],
+                "combined_score": best_match["combined_score"],
+                "all_matches": matches  # Store all matches above threshold
+            }
+            
             if best_match["combined_score"] > SIMILARITY_THRESHOLD:
+                print(f"  ✓ MATCHED - Page {page_idx + 1} identified as first page")
                 first_pages.append(page_idx)
+            else:
+                print(f"  ✗ NOT MATCHED - Score below threshold")
+        else:
+            # No matches found, but store info anyway
+            print(f"Page {page_idx + 1}: No matches found (all below threshold)")
+            similarity_info[page_idx] = {
+                "matched": False,
+                "best_match": None,
+                "image_similarity": 0.0,
+                "text_similarity": 0.0,
+                "combined_score": 0.0,
+                "all_matches": []
+            }
     
-    return first_pages
+    return first_pages, similarity_info
 
 
 def split_composite_pdf(
     composite_pdf_path: str,
     output_dir: str,
     embeddings_path: str = None
-) -> List[Dict[str, str]]:
+) -> Tuple[List[Dict[str, str]], Dict[int, Dict]]:
     """
     Split a composite PDF into individual documents based on identified first pages.
     
@@ -105,14 +137,14 @@ def split_composite_pdf(
         embeddings_path: Path to embeddings JSON file
     
     Returns:
-        List of dictionaries with 'filename' and 'path' for each split document
+        Tuple of (list of split documents, similarity info dict)
     """
     # Find first pages
     if embeddings_path is None:
         from utils import get_backend_dir
         embeddings_path = os.path.join(get_backend_dir(), "data", "embeddings.json")
     
-    first_pages = find_first_pages(composite_pdf_path, embeddings_path)
+    first_pages, similarity_info = find_first_pages(composite_pdf_path, embeddings_path)
     
     if not first_pages:
         raise ValueError("No first pages identified. Cannot split PDF.")
@@ -166,12 +198,21 @@ def split_composite_pdf(
         with open(output_path, 'wb') as output_file:
             writer.write(output_file)
         
+        # Get similarity info for the first page of this document
+        page_similarity = similarity_info.get(start_page, {})
+        
         split_documents.append({
             "filename": output_filename,
             "path": output_path,
             "start_page": start_page + 1,  # 1-indexed for display
-            "end_page": end_page
+            "end_page": end_page,
+            "similarity": {
+                "matched_document": page_similarity.get("best_match"),
+                "image_similarity": round(page_similarity.get("image_similarity", 0.0), 4),
+                "text_similarity": round(page_similarity.get("text_similarity", 0.0), 4),
+                "combined_score": round(page_similarity.get("combined_score", 0.0), 4)
+            }
         })
     
-    return split_documents
+    return split_documents, similarity_info
 

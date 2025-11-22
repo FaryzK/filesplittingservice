@@ -4,7 +4,7 @@ from typing import Dict, Tuple
 from pdf_processor import pdf_to_images, extract_text_from_page
 from content_detector import detect_content_area, crop_to_content, get_content_area_with_visualization
 from embeddings import generate_image_embedding, generate_text_embedding
-from utils import add_training_embedding
+from utils import add_training_embedding, get_backend_dir, ensure_directory
 
 
 def process_training_document(pdf_path: str, filename: str) -> Dict:
@@ -40,9 +40,35 @@ def process_training_document(pdf_path: str, filename: str) -> Dict:
     text = extract_text_from_page(pdf_path, 0)
     text_embedding = generate_text_embedding(text)
     
-    # Store embeddings
+    # Save pipeline preview images for later review
+    preview_dir = os.path.join(get_backend_dir(), "data", "training_previews")
+    ensure_directory(preview_dir)
+    
+    # Create safe filename (remove special characters)
+    safe_filename = "".join(c for c in filename if c.isalnum() or c in (' ', '-', '_', '.')).rstrip()
+    safe_filename = safe_filename.replace(' ', '_')
+    
+    original_path = os.path.join(preview_dir, f"{safe_filename}_original.png")
+    cropped_path = os.path.join(preview_dir, f"{safe_filename}_cropped.png")
+    
+    # Save images
+    first_page_image.save(original_path, "PNG")
+    cropped_image.save(cropped_path, "PNG")
+    
+    print(f"Saving pipeline preview images...")
+    print(f"  Original: {original_path}")
+    print(f"  Cropped: {cropped_path}")
+    
+    # Store embeddings with preview paths
     print("Storing embeddings...")
-    add_training_embedding(filename, image_embedding, text_embedding, bbox)
+    add_training_embedding(
+        filename, 
+        image_embedding, 
+        text_embedding, 
+        bbox,
+        original_image_path=original_path,
+        cropped_image_path=cropped_path
+    )
     
     print(f"Training complete for {filename}!")
     

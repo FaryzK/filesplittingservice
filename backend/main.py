@@ -118,9 +118,9 @@ async def run_inference(file: UploadFile = File(...)):
     try:
         # Split composite PDF
         output_dir = outputs_dir
-        split_docs = split_composite_pdf(upload_path, output_dir)
+        split_docs, similarity_info = split_composite_pdf(upload_path, output_dir)
         
-        # Return list of split documents
+        # Return list of split documents (similarity scores are logged, not returned)
         return {
             "status": "success",
             "split_documents": [
@@ -160,9 +160,58 @@ async def get_training_status():
     """
     embeddings = load_embeddings()
     
+    # Return documents with their preview info
+    documents = []
+    for filename, data in embeddings.items():
+        documents.append({
+            "filename": filename,
+            "bbox": data.get("bbox"),
+            "has_preview": bool(data.get("original_image_path") and data.get("cropped_image_path"))
+        })
+    
     return {
-        "trained_documents": list(embeddings.keys()),
+        "trained_documents": documents,
         "count": len(embeddings)
+    }
+
+
+@app.get("/api/training-preview/{filename:path}")
+async def get_training_preview(filename: str):
+    """
+    Get saved pipeline preview for a trained document.
+    """
+    from urllib.parse import unquote
+    # Decode URL-encoded filename
+    filename = unquote(filename)
+    
+    embeddings = load_embeddings()
+    
+    if filename not in embeddings:
+        raise HTTPException(status_code=404, detail="Document not found in training data")
+    
+    doc_data = embeddings[filename]
+    original_path = doc_data.get("original_image_path")
+    cropped_path = doc_data.get("cropped_image_path")
+    
+    if not original_path or not cropped_path:
+        raise HTTPException(status_code=404, detail="Preview images not found for this document")
+    
+    if not os.path.exists(original_path) or not os.path.exists(cropped_path):
+        raise HTTPException(status_code=404, detail="Preview image files not found")
+    
+    # Load and convert images to base64
+    from PIL import Image
+    original_img = Image.open(original_path)
+    cropped_img = Image.open(cropped_path)
+    
+    original_b64 = image_to_base64(original_img)
+    cropped_b64 = image_to_base64(cropped_img)
+    
+    return {
+        "filename": filename,
+        "bbox": doc_data.get("bbox"),
+        "original_image": original_b64,
+        "cropped_image": cropped_b64
     }
 
 

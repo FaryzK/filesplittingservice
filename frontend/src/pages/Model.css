@@ -102,10 +102,82 @@
 }
 
 .trained-documents li {
-  padding: 8px;
+  padding: 12px;
   margin: 5px 0;
   background-color: white;
   border-radius: 4px;
   border-left: 3px solid #007bff;
+  transition: all 0.2s;
+}
+
+.document-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+
+.document-item:hover {
+  background-color: #f0f0f0;
+  transform: translateX(2px);
+}
+
+.document-item.selected {
+  background-color: #e7f3ff;
+  border-left-color: #0056b3;
+  border-left-width: 4px;
+}
+
+.document-name {
+  flex: 1;
+  font-weight: 500;
+}
+
+.preview-indicator {
+  font-size: 12px;
+  color: #28a745;
+  font-weight: 500;
+}
+
+.no-preview-indicator {
+  font-size: 12px;
+  color: #999;
+  font-style: italic;
+}
+
+.saved-pipeline-preview {
+  margin-top: 30px;
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 2px solid #007bff;
+}
+
+.preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.preview-header h3 {
+  margin: 0;
+  color: #333;
+}
+
+.close-preview-btn {
+  padding: 6px 12px;
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.close-preview-btn:hover {
+  background-color: #5a6268;
 }
 

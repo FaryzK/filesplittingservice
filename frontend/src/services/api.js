@@ -42,3 +42,8 @@ export const previewPipeline = async (file) => {
   return response.data;
 };
 
+export const getTrainingPreview = async (filename) => {
+  const response = await api.get(`/api/training-preview/${encodeURIComponent(filename)}`);
+  return response.data;
+};
+

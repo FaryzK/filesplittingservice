@@ -22,11 +22,15 @@ build/
 .env.*.local
 
 # Backend specific
-backend/data/
+backend/data/embeddings.json
+backend/data/training_previews/
 backend/uploads/
 backend/outputs/
 sample/
 *.pdf
+
+# Keep data directory structure but ignore contents
+!backend/data/.gitkeep
 
 # Node
 node_modules/
