@@ -47,3 +47,8 @@ export const getTrainingPreview = async (filename) => {
   return response.data;
 };
 
+export const getInferenceProgress = async (jobId) => {
+  const response = await api.get(`/api/inference/progress/${jobId}`);
+  return response.data;
+};
+

@@ -1,18 +1,20 @@
 import { useRef } from 'react';
 import './FileUpload.css';
 
-function FileUpload({ onFileSelect, accept = '.pdf', label = 'Upload PDF' }) {
+function FileUpload({ onFileSelect, accept = '.pdf', label = 'Upload PDF', disabled = false }) {
   const fileInputRef = useRef(null);
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
-    if (file) {
+    if (file && !disabled) {
       onFileSelect(file);
     }
   };
 
   const handleClick = () => {
-    fileInputRef.current?.click();
+    if (!disabled) {
+      fileInputRef.current?.click();
+    }
   };
 
   return (
@@ -23,8 +25,9 @@ function FileUpload({ onFileSelect, accept = '.pdf', label = 'Upload PDF' }) {
         accept={accept}
         onChange={handleFileChange}
         style={{ display: 'none' }}
+        disabled={disabled}
       />
-      <button onClick={handleClick} className="upload-button">
+      <button onClick={handleClick} className="upload-button" disabled={disabled}>
         {label}
       </button>
     </div>

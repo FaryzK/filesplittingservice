@@ -15,17 +15,21 @@ load_dotenv(env_path)
 if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 from training import process_training_document, get_training_pipeline_preview
 from inference import split_composite_pdf
 from utils import ensure_directory, load_embeddings
+from progress_tracker import ProgressTracker
 from PIL import Image
 import io
 import base64
+import json
+import asyncio
+import threading
 
 app = FastAPI(title="PDF Document Splitter API")
 
@@ -99,30 +103,18 @@ async def train_model(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Error processing training document: {str(e)}")
 
 
-@app.post("/api/inference")
-async def run_inference(file: UploadFile = File(...)):
-    """
-    Upload a composite PDF for splitting.
-    Returns list of split documents.
-    """
-    if not file.filename.endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="File must be a PDF")
-    
-    # Save uploaded file
-    upload_path = os.path.join(uploads_inference, file.filename)
-    ensure_directory(os.path.dirname(upload_path))
-    
-    with open(upload_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    
+def process_inference_sync(job_id: str, upload_path: str, output_dir: str):
+    """Synchronous wrapper for inference processing."""
     try:
-        # Split composite PDF
-        output_dir = outputs_dir
-        split_docs, similarity_info = split_composite_pdf(upload_path, output_dir)
+        # Create progress callback
+        def progress_callback(**kwargs):
+            ProgressTracker.update_progress(job_id, **kwargs)
         
-        # Return list of split documents (similarity scores are logged, not returned)
-        return {
-            "status": "success",
+        # Split composite PDF
+        split_docs, similarity_info = split_composite_pdf(upload_path, output_dir, progress_callback=progress_callback)
+        
+        # Mark as complete
+        ProgressTracker.complete_job(job_id, {
             "split_documents": [
                 {
                     "filename": doc["filename"],
@@ -131,9 +123,56 @@ async def run_inference(file: UploadFile = File(...)):
                 }
                 for doc in split_docs
             ]
-        }
+        })
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing inference: {str(e)}")
+        import traceback
+        error_msg = str(e)
+        print(f"Error in inference processing: {error_msg}")
+        print(traceback.format_exc())
+        ProgressTracker.fail_job(job_id, error_msg)
+
+
+@app.post("/api/inference")
+async def run_inference(file: UploadFile = File(...), background_tasks: BackgroundTasks = None):
+    """
+    Upload a composite PDF for splitting.
+    Returns job_id for progress tracking.
+    """
+    if not file.filename.endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="File must be a PDF")
+    
+    # Create progress tracking job
+    job_id = ProgressTracker.create_job()
+    
+    # Save uploaded file
+    upload_path = os.path.join(uploads_inference, file.filename)
+    ensure_directory(os.path.dirname(upload_path))
+    
+    with open(upload_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    
+    # Run inference in background thread (since it's CPU-bound)
+    thread = threading.Thread(
+        target=process_inference_sync,
+        args=(job_id, upload_path, outputs_dir),
+        daemon=True
+    )
+    thread.start()
+    
+    return {"job_id": job_id, "status": "started"}
+
+
+@app.get("/api/inference/progress/{job_id}")
+async def get_inference_progress(job_id: str):
+    """
+    Get progress for an inference job.
+    """
+    progress = ProgressTracker.get_progress(job_id)
+    
+    if not progress:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    return progress
 
 
 @app.get("/api/download/{filename}")

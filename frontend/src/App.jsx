@@ -9,7 +9,7 @@ function Navigation() {
   return (
     <nav className="navigation">
       <div className="nav-container">
-        <h1 className="nav-title">PDF Document Splitter</h1>
+        <h1 className="nav-title">Document Splitter</h1>
         <div className="nav-links">
           <Link
             to="/"

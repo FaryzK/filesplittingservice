@@ -1,6 +1,6 @@
 """Inference pipeline for splitting composite PDFs based on training embeddings."""
 import os
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional, Callable
 # Use pypdf (better maintained) if available, fallback to PyPDF2
 try:
     from pypdf import PdfReader, PdfWriter
@@ -17,7 +17,11 @@ from utils import load_embeddings
 SIMILARITY_THRESHOLD = 0.95
 
 
-def find_first_pages(composite_pdf_path: str, embeddings_path: str = None) -> Tuple[List[int], Dict[int, Dict]]:
+def find_first_pages(
+    composite_pdf_path: str, 
+    embeddings_path: str = None,
+    progress_callback: Optional[Callable] = None
+) -> Tuple[List[int], Dict[int, Dict]]:
     """
     Identify first pages in a composite PDF by comparing embeddings.
     
@@ -39,14 +43,32 @@ def find_first_pages(composite_pdf_path: str, embeddings_path: str = None) -> Tu
         raise ValueError("No training embeddings found. Please train the model first.")
     
     # Convert PDF to images and extract text
+    if progress_callback:
+        progress_callback(status="loading", message="Converting PDF to images...")
+    
     page_images = pdf_to_images(composite_pdf_path)
     page_texts = extract_text_from_pdf(composite_pdf_path)
+    total_pages = len(page_images)
+    
+    if progress_callback:
+        progress_callback(
+            status="processing",
+            total_pages=total_pages,
+            message=f"Processing {total_pages} pages..."
+        )
     
     first_pages = []
     similarity_info = {}  # Store similarity scores for each page
     
     # Process each page
     for page_idx in range(len(page_images)):
+        if progress_callback:
+            progress_callback(
+                status="processing",
+                current_page=page_idx + 1,
+                total_pages=total_pages,
+                message=f"Analyzing page {page_idx + 1} of {total_pages}..."
+            )
         page_image = page_images[page_idx]
         
         # Detect content area and crop
@@ -106,8 +128,39 @@ def find_first_pages(composite_pdf_path: str, embeddings_path: str = None) -> Tu
             if best_match["combined_score"] > SIMILARITY_THRESHOLD:
                 print(f"  ✓ MATCHED - Page {page_idx + 1} identified as first page")
                 first_pages.append(page_idx)
+                
+                # Notify progress callback
+                if progress_callback:
+                    progress_callback(
+                        status="processing",
+                        current_page=page_idx + 1,
+                        total_pages=total_pages,
+                        message=f"✓ Document identified at page {page_idx + 1}",
+                        page_info={
+                            "page": page_idx + 1,
+                            "matched": True,
+                            "best_match": best_match["filename"]
+                        },
+                        identified_document={
+                            "page": page_idx + 1,
+                            "matched_document": best_match["filename"],
+                            "confidence": round(best_match["combined_score"] * 100, 2)
+                        }
+                    )
             else:
                 print(f"  ✗ NOT MATCHED - Score below threshold")
+                # Still notify progress callback for non-matched pages
+                if progress_callback:
+                    progress_callback(
+                        status="processing",
+                        current_page=page_idx + 1,
+                        total_pages=total_pages,
+                        page_info={
+                            "page": page_idx + 1,
+                            "matched": False,
+                            "best_match": best_match["filename"]
+                        }
+                    )
         else:
             # No matches found, but store info anyway
             print(f"Page {page_idx + 1}: No matches found (all below threshold)")
@@ -119,6 +172,19 @@ def find_first_pages(composite_pdf_path: str, embeddings_path: str = None) -> Tu
                 "combined_score": 0.0,
                 "all_matches": []
             }
+            
+            # Notify progress callback for pages with no matches
+            if progress_callback:
+                progress_callback(
+                    status="processing",
+                    current_page=page_idx + 1,
+                    total_pages=total_pages,
+                    page_info={
+                        "page": page_idx + 1,
+                        "matched": False,
+                        "best_match": None
+                    }
+                )
     
     return first_pages, similarity_info
 
@@ -126,7 +192,8 @@ def find_first_pages(composite_pdf_path: str, embeddings_path: str = None) -> Tu
 def split_composite_pdf(
     composite_pdf_path: str,
     output_dir: str,
-    embeddings_path: str = None
+    embeddings_path: str = None,
+    progress_callback: Optional[Callable] = None
 ) -> Tuple[List[Dict[str, str]], Dict[int, Dict]]:
     """
     Split a composite PDF into individual documents based on identified first pages.
@@ -144,7 +211,10 @@ def split_composite_pdf(
         from utils import get_backend_dir
         embeddings_path = os.path.join(get_backend_dir(), "data", "embeddings.json")
     
-    first_pages, similarity_info = find_first_pages(composite_pdf_path, embeddings_path)
+    if progress_callback:
+        progress_callback(status="analyzing", message="Identifying document boundaries...")
+    
+    first_pages, similarity_info = find_first_pages(composite_pdf_path, embeddings_path, progress_callback)
     
     if not first_pages:
         raise ValueError("No first pages identified. Cannot split PDF.")
@@ -161,8 +231,19 @@ def split_composite_pdf(
     
     split_documents = []
     
+    if progress_callback:
+        progress_callback(
+            status="splitting",
+            message=f"Creating {len(first_pages) - 1} individual documents..."
+        )
+    
     # Split PDF at identified boundaries
     for i in range(len(first_pages) - 1):
+        if progress_callback:
+            progress_callback(
+                status="splitting",
+                message=f"Generating document {i + 1} of {len(first_pages) - 1}..."
+            )
         start_page = first_pages[i]
         end_page = first_pages[i + 1]
         
