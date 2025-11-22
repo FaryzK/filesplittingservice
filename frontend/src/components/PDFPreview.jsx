@@ -13,7 +13,6 @@ if (typeof window !== 'undefined') {
 
 function PDFPreview({ filename, onClose }) {
   const [numPages, setNumPages] = useState(null);
-  const [pageNumber, setPageNumber] = useState(1);
 
   function onDocumentLoadSuccess({ numPages }) {
     setNumPages(numPages);
@@ -38,30 +37,33 @@ function PDFPreview({ filename, onClose }) {
           </div>
         </div>
         <div className="pdf-preview-content">
-          <div className="pdf-navigation">
-            <button
-              onClick={() => setPageNumber((prev) => Math.max(1, prev - 1))}
-              disabled={pageNumber <= 1}
-            >
-              Previous
-            </button>
-            <span>
-              Page {pageNumber} of {numPages || '--'}
-            </span>
-            <button
-              onClick={() => setPageNumber((prev) => Math.min(numPages || 1, prev + 1))}
-              disabled={pageNumber >= (numPages || 1)}
-            >
-              Next
-            </button>
-          </div>
+          {numPages && (
+            <div className="pdf-page-info">
+              <span>{numPages} page{numPages !== 1 ? 's' : ''}</span>
+            </div>
+          )}
           <div className="pdf-viewer">
             <Document
               file={downloadFile(filename)}
               onLoadSuccess={onDocumentLoadSuccess}
               loading={<div>Loading PDF...</div>}
+              options={{
+                cMapUrl: 'https://unpkg.com/pdfjs-dist@3.11.174/cmaps/',
+                cMapPacked: true,
+              }}
             >
-              <Page pageNumber={pageNumber} width={800} />
+              {numPages && Array.from(new Array(numPages), (el, index) => (
+                <div key={`page_wrapper_${index + 1}`} className="pdf-page-wrapper">
+                  <Page
+                    key={`page_${index + 1}`}
+                    pageNumber={index + 1}
+                    width={800}
+                    renderTextLayer={true}
+                    renderAnnotationLayer={true}
+                    className="pdf-page"
+                  />
+                </div>
+              ))}
             </Document>
           </div>
         </div>

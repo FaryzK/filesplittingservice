@@ -134,23 +134,28 @@ def split_composite_pdf(
         start_page = first_pages[i]
         end_page = first_pages[i + 1]
         
-        # Create new PDF writer
+        # Create new PDF writer for each split document
         writer = PdfWriter()
         
-        # Clone reader to preserve document structure and resources (fonts, images, etc.)
-        # This is crucial for preserving formatting
-        if USE_PYPDF:
-            writer.clone_reader_document_root(reader)
-        else:
-            # For PyPDF2, try to clone document root if method exists
-            if hasattr(writer, 'clone_reader_document_root'):
-                writer.clone_reader_document_root(reader)
+        # Add only the specific pages we want (from start to end)
+        # Don't use clone_reader_document_root as it may include all pages
+        print(f"\nCreating Document {i + 1}:")
+        print(f"  Start page (0-indexed): {start_page}")
+        print(f"  End page (0-indexed): {end_page}")
+        print(f"  Pages to include: {list(range(start_page, end_page))}")
         
-        # Add pages from start to end (exclusive)
-        # Cloning the document root first helps preserve all resources
         for page_num in range(start_page, end_page):
             page = reader.pages[page_num]
             writer.add_page(page)
+            print(f"  Added page {page_num + 1} (index {page_num})")
+        
+        # Verify we have the correct number of pages
+        expected_pages = end_page - start_page
+        actual_pages = len(writer.pages)
+        print(f"  Result: {actual_pages} pages in document (expected {expected_pages})")
+        
+        if actual_pages != expected_pages:
+            print(f"  ERROR: Page count mismatch!")
         
         # Generate output filename
         base_name = os.path.splitext(os.path.basename(composite_pdf_path))[0]

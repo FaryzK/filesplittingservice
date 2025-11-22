@@ -73,7 +73,7 @@ function Model() {
       <FileUpload
         onFileSelect={handleFileSelect}
         accept=".pdf"
-        label={mode === 'preview' ? 'Preview Document' : 'Upload Training Document'}
+        label="Upload File"
       />
 
       {file && (

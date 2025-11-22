@@ -37,15 +37,15 @@ function Inference() {
 
   return (
     <div className="inference-page">
-      <h1>Document Splitting (Inference)</h1>
+      <h1>Document Splitter</h1>
       <p className="page-description">
-        Upload a composite PDF document to automatically split it into individual documents.
+        Upload a document to automatically split it into individual documents.
       </p>
 
       <FileUpload
         onFileSelect={handleFileSelect}
         accept=".pdf"
-        label="Upload Composite PDF"
+        label="Upload File"
       />
 
       {file && (
