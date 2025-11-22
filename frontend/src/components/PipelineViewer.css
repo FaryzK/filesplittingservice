@@ -1,0 +1,52 @@
+.pipeline-viewer {
+  margin: 20px 0;
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+}
+
+.pipeline-viewer h3 {
+  margin-top: 0;
+  color: #333;
+}
+
+.pipeline-steps {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.pipeline-step {
+  flex: 1;
+  min-width: 300px;
+  background: white;
+  padding: 15px;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.pipeline-step h4 {
+  margin-top: 0;
+  color: #555;
+  font-size: 16px;
+}
+
+.pipeline-image {
+  max-width: 100%;
+  height: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.bbox-info {
+  padding: 10px;
+  background-color: #e9ecef;
+  border-radius: 4px;
+}
+
+.bbox-info p {
+  margin: 5px 0;
+  font-family: monospace;
+  font-size: 14px;
+}
+
